@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sampath Host Checker</title>
+    <style>
+        /* --- Styles මෙතන තියෙනවා (වෙනසක් නෑ) --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background-color: #000; color: #0f0; font-family: 'Courier New', Courier, monospace; overflow-x: hidden; }
+        #matrix-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; }
+        .container { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; padding: 20px; text-align: center; background-color: rgba(0, 0, 0, 0.5); }
+        h1 { font-size: 2.5em; color: #0f0; text-shadow: 0 0 5px #0f0, 0 0 10px #0f0, 0 0 20px #0f0, 0 0 40px #0f0, 0 0 80px #0f0; margin-bottom: 20px; letter-spacing: 3px; animation: flicker 1.5s infinite alternate; }
+        @keyframes flicker { 0%, 18%, 22%, 25%, 53%, 57%, 100% { text-shadow: 0 0 4px #0f0, 0 0 11px #0f0, 0 0 19px #0f0, 0 0 40px #0f0, 0 0 80px #0f0; } 20%, 24%, 55% { text-shadow: none; } }
+        #host-list { width: 95%; max-width: 800px; height: 250px; background-color: #0a0a0a; border: 2px solid #0f0; color: #0f0; padding: 15px; font-family: 'Courier New', Courier, monospace; font-size: 1em; margin-bottom: 20px; resize: vertical; box-shadow: 0 0 10px #0f0 inset; }
+        #host-list::placeholder { color: #0a0; opacity: 0.7; }
+        .button-container { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+        .btn { padding: 12px 25px; border: 2px solid #0f0; background-color: transparent; color: #0f0; font-size: 1.1em; font-family: 'Courier New', Courier, monospace; cursor: pointer; text-decoration: none; margin: 5px; transition: all 0.3s ease; text-shadow: 0 0 5px #0f0; }
+        .btn:hover { background-color: #0f0; color: #000; box-shadow: 0 0 20px #0f0; }
+        .btn-danger { color: #f00; border-color: #f00; text-shadow: 0 0 5px #f00; }
+        .btn-danger:hover { background-color: #f00; color: #000; box-shadow: 0 0 20px #f00; }
+        .btn-warning { color: #ff0; border-color: #ff0; text-shadow: 0 0 5px #ff0; }
+        .btn-warning:hover { background-color: #ff0; color: #000; box-shadow: 0 0 20px #ff0; }
+        #stop-btn { display: none; }
+        #status-message { margin-top: 15px; font-size: 1.1em; color: #ff0; min-height: 20px; }
+        #results-container { width: 95%; max-width: 800px; margin-top: 20px; border: 1px solid #0f0; padding: 10px; min-height: 50px; background-color: #050505; }
+        .result-box { padding: 8px; margin: 5px 0; border-radius: 3px; font-weight: bold; text-align: left; display: flex; justify-content: space-between; align-items: center; }
+        .working { background-color: rgba(0, 255, 0, 0.1); border-left: 5px solid #0f0; color: #0f0; }
+        .not-working { background-color: rgba(255, 0, 0, 0.1); border-left: 5px solid #f00; color: #f00; }
+        .ping-time { color: #aaa; font-size: 0.9em; }
+        .contact-info { margin-top: 40px; border-top: 1px solid #0f0; padding-top: 20px; width: 95%; max-width: 800px; }
+        .contact-info h3 { margin-bottom: 15px; color: #0f0; text-shadow: 0 0 5px #0f0; }
+        .contact-info a { margin: 0 10px; }
+    </style>
+</head>
+<body>
+
+    <canvas id="matrix-canvas"></canvas>
+
+    <div class="container">
+        <h1>Sampath Host Checker</h1>
+        <textarea id="host-list" placeholder="Enter hosts here, one per line..."></textarea>
+        <div class="button-container">
+            <button id="check-btn" class="btn">Check Hosts</button>
+            <button id="stop-btn" class="btn btn-danger">Stop</button>
+            <button id="clear-btn" class="btn btn-warning">Clear</button>
+        </div>
+        <div id="status-message"></div>
+        <div id="results-container"></div>
+        <div class="contact-info">
+            <h3>Owner Contact</h3>
+            <a href="https://wa.me/94729669087" target="_blank" class="btn">WhatsApp</a>
+            <a href="mailto:dananjayas362@gmail.com" class="btn">Gmail</a>
+        </div>
+    </div>
+
+    <script>
+        // --- Matrix Animation (වෙනසක් නෑ) ---
+        const canvas = document.getElementById('matrix-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789@#$%^&*()*&^%+-/~{[|`]}';
+        const fontSize = 16;
+        const columns = canvas.width / fontSize;
+        const drops = [];
+        for (let x = 0; x < columns; x++) { drops[x] = 1; }
+        function drawMatrix() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#0f0';
+            ctx.font = fontSize + 'px monospace';
+            for (let i = 0; i < drops.length; i++) {
+                const text = letters.charAt(Math.floor(Math.random() * letters.length));
+                ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+                if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+                    drops[i] = 0;
+                }
+                drops[i]++;
+            }
+        }
+        setInterval(drawMatrix, 33);
+
+        // --- Host Checker Script ---
+        const checkBtn = document.getElementById('check-btn');
+        const stopBtn = document.getElementById('stop-btn');
+        const clearBtn = document.getElementById('clear-btn');
+        const hostListTextarea = document.getElementById('host-list');
+        const resultsContainer = document.getElementById('results-container');
+        const statusMessage = document.getElementById('status-message');
+
+        let isChecking = false;
+
+        clearBtn.addEventListener('click', () => {
+            hostListTextarea.value = '';
+            resultsContainer.innerHTML = '';
+            statusMessage.innerText = 'Host list and results cleared.';
+        });
+
+        stopBtn.addEventListener('click', () => {
+            isChecking = false;
+            statusMessage.innerText = 'Stopping... Please wait.';
+        });
+
+        checkBtn.addEventListener('click', async () => {
+            const hosts = hostListTextarea.value.split('\n').filter(host => host.trim() !== '');
+            if (hosts.length === 0) {
+                statusMessage.innerText = "Please enter at least one host.";
+                return;
+            }
+            isChecking = true;
+            resultsContainer.innerHTML = '';
+            statusMessage.innerText = 'Initializing...';
+            checkBtn.style.display = 'none';
+            stopBtn.style.display = 'inline-block';
+            clearBtn.style.display = 'none';
+
+            let workingCount = 0;
+            let notWorkingCount = 0;
+
+            for (let i = 0; i < hosts.length; i++) {
+                if (!isChecking) {
+                    statusMessage.innerText = 'Process stopped by user.';
+                    break;
+                }
+                const host = hosts[i].trim();
+                statusMessage.innerText = `Checking (${i + 1}/${hosts.length}): ${host}`;
+                const startTime = performance.now();
+                let pingTime = 0;
+
+                try {
+                    // --- මෙතන තමයි වෙනස කලේ ---
+                    // බලන් ඉන්න කාලය 5000ms (තත්පර 5) සිට 3000ms (තත්පර 3) දක්වා අඩු කලා
+                    await fetch(`https://${host}`, { method: 'HEAD', mode: 'no-cors', signal: AbortSignal.timeout(3000) });
+                    const endTime = performance.now();
+                    pingTime = endTime - startTime;
+                    appendResult(host, true, pingTime);
+                    workingCount++;
+                } catch (error) {
+                    if (error.name !== 'AbortError') {
+                        appendResult(host, false, 0);
+                        notWorkingCount++;
+                    }
+                }
+            }
+            
+            if (isChecking) {
+                statusMessage.innerHTML = `Done! <span style="color:#0f0;">Working: ${workingCount}</span> | <span style="color:#f00;">Not Working: ${notWorkingCount}</span>`;
+            }
+            
+            isChecking = false;
+            checkBtn.style.display = 'inline-block';
+            stopBtn.style.display = 'none';
+            clearBtn.style.display = 'inline-block';
+        });
+
+        function appendResult(host, isWorking, pingTime) {
+            const resultBox = document.createElement('div');
+            resultBox.className = 'result-box';
+            if (isWorking) {
+                resultBox.classList.add('working');
+                resultBox.innerHTML = `<span>✅ WORKING - ${host}</span> <span class="ping-time">(${Math.round(pingTime)} ms)</span>`;
+            } else {
+                resultBox.classList.add('not-working');
+                resultBox.innerText = `❌ NOT WORKING - ${host}`;
+            }
+            resultsContainer.appendChild(resultBox);
+        }
+    </script>
+</body>
+</html>
